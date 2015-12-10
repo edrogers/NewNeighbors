@@ -9,6 +9,8 @@ from datetime import datetime, date
 import config
 from difflib import unified_diff
 
+logfilename = "errorlog.txt"
+
 def send_email(user, pwd, recipient, subject, body):                                                                            
     import smtplib                                                                                                              
                                                                                                                                 
@@ -31,9 +33,13 @@ def send_email(user, pwd, recipient, subject, body):
         server_ssl.sendmail(FROM, TO, message)
         #server_ssl.quit()
         server_ssl.close()
-        print 'successfully sent the mail'
-    except:                                                                  
-        print "failed to send mail"                                                                                             
+        # print 'successfully sent the mail'
+    except Exception as e:                                                                  
+        logfile = open(logfilename,'a')
+        className = "ERROR:"
+        logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+        logfile.close()
+        raise
 
 #First, download all the parcels in Ward 79
 httpRequestURL="https://data.cityofmadison.com/resource/u7ns-6d4x.csv?ward=79&$limit=5000"
@@ -50,8 +56,6 @@ except OSError:
 fileout = open(filename,'wb')
 fileout.write(r.content)
 fileout.close()
-
-logfilename = "errorlog.txt"
 
 now = datetime.now()
 csvfilename = "OwnerListing_{dt:%Y%m%d}.csv".format(dt=datetime.now())
@@ -210,8 +214,8 @@ if len(ownerListingFiles) > 1 :
         emailBodyLines.append("")
         subjectLine = "Parcel Listing Updates for {dt:%B} {dt:%Y}".format(dt=datetime.now())
         emailBody = "\r\n".join(emailBodyLines)
-        print subjectLine
-        print emailBody
+        # print subjectLine
+        # print emailBody
         send_email(config.gmailAddress,
                    config.gmailPassword,
                    config.targetAddress,
