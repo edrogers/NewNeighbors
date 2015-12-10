@@ -8,6 +8,7 @@ import glob, os
 from datetime import datetime, date
 import config
 from difflib import unified_diff
+import errno
 
 logfilename = "errorlog.txt"
 
@@ -51,8 +52,15 @@ r=requests.get(httpRequestURL,headers=headers)
 filename = "Assessor_Property_Information.csv"
 try:
     os.remove(filename)
-except OSError:
-    pass
+except OSError as e:
+    if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+        logfile = open(logfilename,'a')
+        className = "ERROR:"
+        logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+        logfile.close()
+        raise
+    else :
+        pass
 fileout = open(filename,'wb')
 fileout.write(r.content)
 fileout.close()
@@ -62,8 +70,15 @@ csvfilename = "OwnerListing_{dt:%Y%m%d}.csv".format(dt=datetime.now())
 
 try:
     os.remove(csvfilename)
-except OSError:
-    pass
+except OSError as e:
+    if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+        logfile = open(logfilename,'a')
+        className = "ERROR:"
+        logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+        logfile.close()
+        raise
+    else :
+        pass
 
 #Next, use the parcel numbers & the city website to find the owners' names
 parcelNumRE=re.compile("[0-9]{12}")
@@ -106,8 +121,15 @@ for line in open(filename) :
         filein.close()
         try:
             os.remove(filename)
-        except OSError:
-            pass
+        except OSError as e:
+            if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+                logfile = open(logfilename,'a')
+                className = "ERROR:"
+                logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+                logfile.close()
+                raise
+            else :
+                pass
         # Make that name more legible and replace semicolons with double commas
         ownerNamesPretty=ownerNames.replace('&amp;','&').replace('<br> ','').replace(';',',,')
         # Append the result to a CSV of parcel numbers and owner names
