@@ -50,17 +50,6 @@ dirName=os.path.dirname(os.path.realpath(__file__))
 
 r=requests.get(httpRequestURL,headers=headers)
 filename = "Assessor_Property_Information.csv"
-try:
-    os.remove(filename)
-except OSError as e:
-    if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
-        logfile = open(logfilename,'a')
-        className = "ERROR:"
-        logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
-        logfile.close()
-        raise
-    else :
-        pass
 fileout = open(filename,'wb')
 fileout.write(r.content)
 fileout.close()
@@ -121,15 +110,12 @@ for line in open(filename) :
         filein.close()
         try:
             os.remove(filename)
-        except OSError as e:
-            if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
-                logfile = open(logfilename,'a')
-                className = "ERROR:"
-                logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
-                logfile.close()
-                raise
-            else :
-                pass
+        except Exception as e:
+            logfile = open(logfilename,'a')
+            className = "ERROR:"
+            logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+            logfile.close()
+            raise
         # Make that name more legible and replace semicolons with double commas
         ownerNamesPretty=ownerNames.replace('&amp;','&').replace('<br> ','').replace(';',',,')
         # Append the result to a CSV of parcel numbers and owner names
@@ -138,7 +124,7 @@ for line in open(filename) :
         csvOut.write("{};{}\n".format(parcelAndAddress,ownerNamesPretty))
         csvOut.close()
         # Impose a brief pause as a courtesy to the city
-        sleep(4)
+        sleep(5)
 
 
 lastCSVEntryRE=re.compile("[^;]+$")
