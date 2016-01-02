@@ -10,7 +10,9 @@ import config
 from difflib import unified_diff
 import errno
 
-logfilename = "errorlog.txt"
+dirName=os.path.dirname(os.path.realpath(__file__))
+
+logfilename = "{}/errorlog.txt".format(dirName)
 
 def send_email(user, pwd, recipient, subject, body):                                                                            
     import smtplib                                                                                                              
@@ -46,16 +48,14 @@ def send_email(user, pwd, recipient, subject, body):
 httpRequestURL="https://data.cityofmadison.com/resource/u7ns-6d4x.csv?ward=79&$limit=5000"
 headers={'X-App-Token': config.cityOfMadisonToken}
 
-dirName=os.path.dirname(os.path.realpath(__file__))
-
 r=requests.get(httpRequestURL,headers=headers)
-filename = "Assessor_Property_Information.csv"
+filename = "{}/Assessor_Property_Information.csv".format(dirName)
 fileout = open(filename,'wb')
 fileout.write(r.content)
 fileout.close()
 
 now = datetime.now()
-csvfilename = "OwnerListing_{dt:%Y%m%d}.csv".format(dt=datetime.now())
+csvfilename = "{}/OwnerListing_{dt:%Y%m%d}.csv".format(dirName, dt=datetime.now())
 
 try:
     os.remove(csvfilename)
@@ -97,7 +97,7 @@ for line in open(filename) :
                 logfile.close()
 
         # Save that content to a local file
-        filename = "Madison_Parcel_{}.html".format(parcelNum)
+        filename = "{}/Madison_Parcel_{}.html".format(dirName,parcelNum)
         fileout = open(filename,'wb')
         fileout.write(resp.content)
         fileout.close()
