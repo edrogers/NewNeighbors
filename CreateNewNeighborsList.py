@@ -126,17 +126,16 @@ for line in open(filename) :
         # Impose a brief pause as a courtesy to the city
         sleep(5)
 
+# Check for any parcels that have changed from the previous listing.
+# For each changed parcel, re-download the parcel listing a few more times
+# to verity beyond a doubt the listing is indeed different (and not a
+# connection issue).
 
 lastCSVEntryRE=re.compile("[^;]+$")
 betweenSemicolons=re.compile(";[^;]+;")
 
 # Now compare the two most recent Owner Listings for any changes:
 ownerListingFiles = sorted(glob.glob(dirName+"/OwnerListing_*.csv"))
-emailBodyLines = []
-emailBodyLines.append("Hello,")
-emailBodyLines.append("")
-emailBodyLines.append("This is the automatically generated email to notify of changes to parcel listings on the City of Madison website.")
-emailBodyLines.append("")
 
 if len(ownerListingFiles) > 1 :
     previousFileName = ownerListingFiles[-2]
@@ -185,6 +184,68 @@ if len(ownerListingFiles) > 1 :
                 matchedThisParcelYet = True
         if matchedThisParcelYet == False :
             parcelsAdded.append([currParcelNum,currAddress,currOwner])
+
+    if len(parcelsChanged) > 0 :
+        parcelsTrulyChanged = []
+        for pC in parcelsChanged :
+            # Download by HTTP four more parcel lookups from the city for this one parcel.
+            # Check which of these are truly different after 5 total lookups
+            lookups = 0
+            newestReadings = ([pC])
+            for i in range(4) :
+                #Each download will make 3 attempts to avoid RequestException, as usual
+                success = False
+                attempts = 0
+                while not success and attempts < 3 :
+                    try :
+                        resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum))
+                        success = True
+                    except requests.exceptions.RequestException as e :
+                        attempts += 1
+                        logfile = open(logfilename,'a')
+                        if attempts == 3 :
+                            className = "ERROR:"
+                        else:
+                            sleep(60)
+                            className = "warn:"
+                        logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,parcelNum,attempts,type(e),e,dt=datetime.now()))
+                        logfile.close()
+                # Save that content to a local file
+                filename = "{}/Madison_Parcel_{}.html".format(dirName,parcelNum)
+                fileout = open(filename,'wb')
+                fileout.write(resp.content)
+                fileout.close()
+                # Now open that file for reading
+                filein = open(filename,'r')
+                lines = filein.readlines()
+                # Read the line that has the Owner's name(s)
+                ownerNames=lines[257].strip()
+                # Close and delete the file
+                filein.close()
+                try:
+                    os.remove(filename)
+                except Exception as e:
+                    logfile = open(logfilename,'a')
+                    className = "ERROR:"
+                    logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+                    logfile.close()
+                    raise
+                # Make that name more legible and replace semicolons with double commas
+                ownerNamesPretty=ownerNames.replace('&amp;','&').replace('<br> ','').replace(';',',,')
+
+                newestReadings.append([pC[0],pC[1],pC[2],pC[3],ownerNamesPretty)
+
+            # Code to select the mode of the 5 elements of newestReadings goes here
+            if mostCommonReading[4] != pC[2] :
+                parcelsTrulyChanged.append([mostCommonReading])
+        parcelsChanged = parcelsTrulyChanged
+
+
+    emailBodyLines = []
+    emailBodyLines.append("Hello,")
+    emailBodyLines.append("")
+    emailBodyLines.append("This is the automatically generated email to notify of changes to parcel listings on the City of Madison website.")
+    emailBodyLines.append("")
 
     if len(parcelsChanged) > 0 :
         emailBodyLines.append("")
