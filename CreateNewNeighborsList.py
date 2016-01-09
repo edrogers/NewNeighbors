@@ -83,10 +83,11 @@ for line in open(filename) :
         success = False
         attempts = 0
         while not success and attempts < 3 :
+            success = True
             try :
                 resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum))
-                success = True
             except requests.exceptions.RequestException as e :
+                success = False
                 attempts += 1
                 logfile = open(logfilename,'a')
                 if attempts == 3 :
