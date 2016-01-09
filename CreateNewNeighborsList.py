@@ -159,7 +159,6 @@ if len(ownerListingFiles) > 1 :
     parcelsChanged = []
     parcelsRemoved = []
     parcelsAdded   = []
-    ownersChanged  = []
     for prevLine in prevLines :
         prevParcelNum = parcelNumRE.match(prevLine).group(0)
         prevAddress = betweenSemicolons.search(prevLine).group(0).strip(';')
@@ -178,7 +177,7 @@ if len(ownerListingFiles) > 1 :
                 else :
                     # For owner changes, recheck the owner a few times before reporting
                     newOwnersList = ([currOwner])
-                    
+
                     for i in range(4) :
                         #Each download will make 3 attempts to avoid RequestException, as usual
                         success = False
