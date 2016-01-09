@@ -292,7 +292,7 @@ if len(ownerListingFiles) > 1 :
         # print emailBody
         send_email(config.gmailAddress,
                    config.gmailPassword,
-                   config.targetAddress,
+                   config.gmailAddress,
                    subjectLine,
                    emailBody)
     
