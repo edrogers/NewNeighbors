@@ -235,8 +235,8 @@ if len(ownerListingFiles) > 1 :
                             linesToEdit = fileToEdit.readlines()
                         with open(currentFileName, "w") as fileToEdit:
                             for lineToEdit in linesToEdit:
-                                fileToEdit.write(re.sub(r'{};{};{}$'.format(currParcelNum,currAddress,currOwner),
-                                                        '{};{};{}'.format(currParcelNum,currAddress,trueNewOwner), lineToEdit))
+                                fileToEdit.write(lineToEdit.replace('{};{};{}'.format(currParcelNum,currAddress,currOwner),
+                                                                    '{};{};{}'.format(currParcelNum,currAddress,trueNewOwner)))
                         currOwner = trueNewOwner
 
                     if prevOwner != currOwner or prevAddress != currAddress :
