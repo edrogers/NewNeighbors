@@ -82,7 +82,7 @@ for line in open(filename) :
         # Download by HTTP a parcel lookup from the city
         success = False
         attempts = 0
-        while not success and attempts < 3 :
+        while not success and attempts < 5 :
             success = True
             try :
                 resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum))
@@ -90,7 +90,7 @@ for line in open(filename) :
                 success = False
                 attempts += 1
                 logfile = open(logfilename,'a')
-                if attempts == 3 :
+                if attempts == 5 :
                     className = "ERROR:"
                 else:
                     sleep(60)
@@ -182,10 +182,10 @@ if len(ownerListingFiles) > 1 :
                     newOwnersList = ([currOwner])
 
                     for i in range(4) :
-                        #Each download will make 3 attempts to avoid RequestException, as usual
+                        #Each download will make 5 attempts to avoid RequestException, as usual
                         success = False
                         attempts = 0
-                        while not success and attempts < 3 :
+                        while not success and attempts < 5 :
                             success = True
                             try :
                                 resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(currParcelNum))
@@ -193,7 +193,7 @@ if len(ownerListingFiles) > 1 :
                                 success = False
                                 attempts += 1
                                 logfile = open(logfilename,'a')
-                                if attempts == 3 :
+                                if attempts == 5 :
                                     className = "ERROR:"
                                 else:
                                     sleep(60)
