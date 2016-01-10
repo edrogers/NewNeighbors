@@ -150,6 +150,8 @@ if len(ownerListingFiles) > 1 :
     currentFile=open(currentFileName,'r')
     prev=previousFile.readlines()
     curr=currentFile.readlines()
+    previousFile.close()
+    currentFile.close()
         
     diff=unified_diff(prev,curr,lineterm='',n=0)
 
@@ -196,10 +198,10 @@ if len(ownerListingFiles) > 1 :
                                 else:
                                     sleep(60)
                                     className = "warn:"
-                                logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,parcelNum,attempts,type(e),e,dt=datetime.now()))
+                                logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,currParcelNum,attempts,type(e),e,dt=datetime.now()))
                                 logfile.close()
                         # Save that content to a local file
-                        filename = "{}/Madison_Parcel_{}.html".format(dirName,parcelNum)
+                        filename = "{}/Madison_Parcel_{}.html".format(dirName,currParcelNum)
                         fileout = open(filename,'wb')
                         fileout.write(resp.content)
                         fileout.close()
@@ -226,9 +228,18 @@ if len(ownerListingFiles) > 1 :
 
                     # Code to select the mode of the 5 elements of newestReadings goes here
                     newOwnerCounter = Counter(newOwnersList)
-                    currOwner = newOwnerCounter.most_common(1)
+                    trueNewOwner = newOwnerCounter.most_common(1)[0][0]
+                    if trueNewOwner != currOwner :
+                        # Need to update OwnerListing_[date].csv
+                        with open(currentFileName, "r") as fileToEdit:
+                            linesToEdit = fileToEdit.readlines()
+                        with open(currentFileName, "w") as fileToEdit:
+                            for lineToEdit in linesToEdit:
+                                fileToEdit.write(re.sub(r'{};{};{}$'.format(currParcelNum,currAddress,currOwner),
+                                                        '{};{};{}'.format(currParcelNum,currAddress,trueNewOwner), lineToEdit))
+                        currOwner = trueNewOwner
 
-                    if prevOwner != currOwner :
+                    if prevOwner != currOwner or prevAddress != currAddress :
                         # This owner change seems legit, go ahead and report it
                         parcelsChanged.append([prevParcelNum,prevAddress,prevOwner,currAddress,currOwner])
                         break
@@ -280,9 +291,6 @@ if len(ownerListingFiles) > 1 :
             emailBodyLines.append("Address: {}".format(pC[1]))
             emailBodyLines.append("")
 
-    previousFile.close()
-    currentFile.close()
-
     if len(parcelsChanged)+len(parcelsAdded)+len(parcelsRemoved) > 0 :
         emailBodyLines.append("This email shows updates to the City of Madison Parcel Listings that occurred between {} and {}.".format(prevDate, currDate))
         emailBodyLines.append("")
@@ -292,7 +300,7 @@ if len(ownerListingFiles) > 1 :
         # print emailBody
         send_email(config.gmailAddress,
                    config.gmailPassword,
-                   config.gmailAddress,
+                   config.targetAddress,
                    subjectLine,
                    emailBody)
     
