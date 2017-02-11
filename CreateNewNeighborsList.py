@@ -11,6 +11,8 @@ from difflib import unified_diff
 import errno
 from collections import Counter
 
+lineNumForOwner=413
+
 dirName=os.path.dirname(os.path.realpath(__file__))
 
 logfilename = "{}/errorlog.txt".format(dirName)
@@ -107,7 +109,7 @@ for line in open(filename) :
         filein = open(filename,'r')
         lines = filein.readlines()
         # Read the line that has the Owner's name(s)
-        ownerNames=lines[257].strip()
+        ownerNames=lines[lineNumForOwner].strip()
         # Close and delete the file
         filein.close()
         try:
@@ -209,7 +211,7 @@ if len(ownerListingFiles) > 1 :
                         filein = open(filename,'r')
                         lines = filein.readlines()
                         # Read the line that has the Owner's name(s)
-                        ownerNames=lines[257].strip()
+                        ownerNames=lines[lineNumForOwner].strip()
                         # Close and delete the file
                         filein.close()
                         try:
