@@ -11,11 +11,66 @@ from difflib import unified_diff
 import errno
 from collections import Counter
 
-lineNumForOwner=413
-
 dirName=os.path.dirname(os.path.realpath(__file__))
 
 logfilename = "{}/errorlog.txt".format(dirName)
+
+def downloadWithReattempts(url,nAttempts,timeDelay,logFileName):
+    success = False
+    attempts = 0
+    while not success and attempts < nAttempts :
+        success = True
+        try :
+            resp = requests.get(url)
+        except requests.exceptions.RequestException as e :
+            success = False
+            attempts += 1
+            with open(logFileName,'a') as logfile:
+                if attempts == nAttempts :
+                    className = "ERROR:"
+                else:
+                    sleep(timeDelay)
+                    className = "warn:"
+                logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,parcelNum,attempts,type(e),e,dt=datetime.now()))
+    return resp
+
+def getLineNumber():
+    parcelNum="070930104032"
+    examplePropertyListingURL="http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum)
+    resp = downloadWithReattempts(examplePropertyListingURL,5,60,logfilename)
+
+    filename = "{}/Madison_Parcel_{}.html".format(dirName,parcelNum)
+    with open(filename,'wb') as fileout:
+        fileout.write(resp.content)
+
+    with open(filename,'r') as filein:
+        lines = filein.readlines()
+        # Fine the line number that has the Owner's name(s)
+        linesWithOwnerNames=[ i for i,line in enumerate(lines) if 'EDWIN L ROGERS' in line ]
+
+    try:
+        os.remove(filename)
+    except BaseException as e:
+        logfile = open(logfilename,'a')
+        className = "ERROR:"
+        logfile.write("{} {dt:%c}; {}: {}\n".format(className,type(e),e,dt=datetime.now()))
+        logfile.close()
+        raise
+
+    if len(linesWithOwnerNames) > 0:
+        return linesWithOwnerNames[0]
+    else:
+        raise IndexError("Line with Owner Name not found")
+
+def getArea(address):
+    addressToAreaFileName="AddressAreaBlock.csv"
+    with open(addressToAreaFileName,'r') as addressToAreaFile:
+        lines=addressToAreaFile.readlines()
+        areasWithThisAddress=[ re.search(",[0-9]+,",line.strip()).group().strip(",") for line in lines if address in line ]
+    if len(areasWithThisAddress) > 0:
+        return areasWithThisAddress[0]
+    else:
+        return "N/A"
 
 def send_email(user, pwd, recipient, subject, body):                                                                            
     import smtplib                                                                                                              
@@ -47,15 +102,16 @@ def send_email(user, pwd, recipient, subject, body):
         logfile.close()
         raise
 
+lineNumForOwner=getLineNumber()
+
 #First, download all the parcels in Ward 79
 httpRequestURL="https://data.cityofmadison.com/resource/u7ns-6d4x.csv?ward=79&$limit=5000"
 headers={'X-App-Token': config.cityOfMadisonToken}
 
 r=requests.get(httpRequestURL,headers=headers)
 filename = "{}/Assessor_Property_Information.csv".format(dirName)
-fileout = open(filename,'wb')
-fileout.write(r.content)
-fileout.close()
+with open(filename,'wb') as fileout:
+    fileout.write(r.content)
 
 now = datetime.now()
 csvfilename = "{}/OwnerListing_{dt:%Y%m%d}.csv".format(dirName, dt=datetime.now())
@@ -82,36 +138,19 @@ for line in open(filename) :
         parcelNum = parcelNumRE.match(parcelAndAddress).group(0)
 
         # Download by HTTP a parcel lookup from the city
-        success = False
-        attempts = 0
-        while not success and attempts < 5 :
-            success = True
-            try :
-                resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum))
-            except requests.exceptions.RequestException as e :
-                success = False
-                attempts += 1
-                logfile = open(logfilename,'a')
-                if attempts == 5 :
-                    className = "ERROR:"
-                else:
-                    sleep(60)
-                    className = "warn:"
-                logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,parcelNum,attempts,type(e),e,dt=datetime.now()))
-                logfile.close()
+        resp = downloadWithReattempts("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(parcelNum),5,60,logfilename)
 
         # Save that content to a local file
         filename = "{}/Madison_Parcel_{}.html".format(dirName,parcelNum)
-        fileout = open(filename,'wb')
-        fileout.write(resp.content)
-        fileout.close()
+        with open(filename,'wb') as fileout:
+            fileout.write(resp.content)
         # Now open that file for reading
-        filein = open(filename,'r')
-        lines = filein.readlines()
+        with open(filename,'r') as filein:
+            lines = filein.readlines()
+
         # Read the line that has the Owner's name(s)
         ownerNames=lines[lineNumForOwner].strip()
-        # Close and delete the file
-        filein.close()
+
         try:
             os.remove(filename)
         except Exception as e:
@@ -132,7 +171,7 @@ for line in open(filename) :
 
 # Check for any parcels that have changed from the previous listing.
 # For each changed parcel, re-download the parcel listing a few more times
-# to verity beyond a doubt the listing is indeed different (and not a
+# to verify beyond a doubt the listing is indeed different (and not a
 # connection issue).
 
 lastCSVEntryRE=re.compile("[^;]+$")
@@ -185,35 +224,20 @@ if len(ownerListingFiles) > 1 :
 
                     for i in range(4) :
                         #Each download will make 5 attempts to avoid RequestException, as usual
-                        success = False
-                        attempts = 0
-                        while not success and attempts < 5 :
-                            success = True
-                            try :
-                                resp = requests.get("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(currParcelNum))
-                            except requests.exceptions.RequestException as e :
-                                success = False
-                                attempts += 1
-                                logfile = open(logfilename,'a')
-                                if attempts == 5 :
-                                    className = "ERROR:"
-                                else:
-                                    sleep(60)
-                                    className = "warn:"
-                                logfile.write("{} {dt:%c}; Parcel# {}; Attempt#: {}; {}: {}\n".format(className,currParcelNum,attempts,type(e),e,dt=datetime.now()))
-                                logfile.close()
+                        resp = downloadWithReattempts("http://www.cityofmadison.com/assessor/property/propertydata.cfm?ParcelN={}".format(currParcelNum),5,60,logfilename)
+
                         # Save that content to a local file
                         filename = "{}/Madison_Parcel_{}.html".format(dirName,currParcelNum)
-                        fileout = open(filename,'wb')
-                        fileout.write(resp.content)
-                        fileout.close()
+                        with open(filename,'wb') as fileout:
+                            fileout.write(resp.content)
+
                         # Now open that file for reading
-                        filein = open(filename,'r')
-                        lines = filein.readlines()
+                        with open(filename,'r') as filein:
+                            lines = filein.readlines()
+
                         # Read the line that has the Owner's name(s)
                         ownerNames=lines[lineNumForOwner].strip()
-                        # Close and delete the file
-                        filein.close()
+
                         try:
                             os.remove(filename)
                         except Exception as e:
@@ -269,11 +293,29 @@ if len(ownerListingFiles) > 1 :
         emailBodyLines.append("")
         emailBodyLines.append("The following {} parcel(s) have changed:".format(len(parcelsChanged)))
         emailBodyLines.append("")
-        for pC in parcelsChanged :
-            emailBodyLines.append("Parcel #: {}".format(pC[0]))
-            emailBodyLines.append("Owner:   {} --> {}".format(pC[2],pC[4]))
-            emailBodyLines.append("Address: {} --> {}".format(pC[1],pC[3]))
-            emailBodyLines.append("")
+        for area in range(17):
+            thisAreaIntroduced=False
+            for pC in parcelsChanged :
+                strArea=str(area)
+                if area==16:
+                    strArea="N/A"
+                if getArea(pC[3]) == strArea :
+                    if not thisAreaIntroduced :
+                        if area != 16:
+                            emailBodyLines.append("Area {}:".format(area))
+                        else :
+                            emailBodyLines.append("Other:".format(area))
+                        thisAreaIntroduced=True
+                    if pC[1]==pC[3]:
+                        emailBodyLines.append("  {}".format(pC[3]))
+                        emailBodyLines.append("    Previous owner:   {}".format(pC[2]))
+                        emailBodyLines.append("    New owner:        {}".format(pC[4]))
+                    else:
+                        emailBodyLines.append("  Changes to parcel #: {}".format(pC[0]))
+                        emailBodyLines.append("    Owner:   {} --> {}".format(pC[2],pC[4]))
+                        emailBodyLines.append("    Address: {} --> {}".format(pC[1],pC[3]))
+            if thisAreaIntroduced:
+                emailBodyLines.append("")
     if len(parcelsRemoved) > 0 :
         emailBodyLines.append("")
         emailBodyLines.append("The following {} parcel(s) have been removed from the city listing:".format(len(parcelsRemoved)))
@@ -294,17 +336,25 @@ if len(ownerListingFiles) > 1 :
             emailBodyLines.append("")
 
     if len(parcelsChanged)+len(parcelsAdded)+len(parcelsRemoved) > 0 :
-        emailBodyLines.append("This email shows updates to the City of Madison Parcel Listings that occurred between {} and {}.".format(prevDate, currDate))
-        emailBodyLines.append("")
-        subjectLine = "Parcel Listing Updates for {dt:%B} {dt:%Y}".format(dt=datetime.now())
-        emailBody = "\r\n".join(emailBodyLines)
-        # print subjectLine
-        # print emailBody
-        send_email(config.gmailAddress,
-                   config.gmailPassword,
-                   config.targetAddress,
-                   subjectLine,
-                   emailBody)
-    
+        if len(parcelsChanged)+len(parcelsAdded)+len(parcelsRemoved) > 100 :
+            message=["THIS EMAIL WAS NOT SENT! SUSPICIOUS OUTPUT DETECTED",""]
+            message.extend(emailBodyLines)
+            subjectLine = "UNSENT: Parcel Listing Updates for {dt:%B} {dt:%Y}".format(dt=datetime.now())
+            emailBody = "\r\n".join(message)
+            send_email(config.gmailAddress,
+                       config.gmailPassword,
+                       config.gmailAddress,
+                       subjectLine,
+                       emailBody)
+        else : 
+            emailBodyLines.append("This email shows updates to the City of Madison Parcel Listings that occurred between {} and {}.".format(prevDate, currDate))
+            emailBodyLines.append("")
+            subjectLine = "Parcel Listing Updates for {dt:%B} {dt:%Y}".format(dt=datetime.now())
+            emailBody = "\r\n".join(emailBodyLines)
+            send_email(config.gmailAddress,
+                       config.gmailPassword,
+                       config.targetAddress,
+                       subjectLine,
+                       emailBody)
 
 quit()
